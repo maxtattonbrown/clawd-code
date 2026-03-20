@@ -1,6 +1,6 @@
 #!/bin/bash
-# ABOUTME: One-command installer for Friendly Setup — makes Claude Code welcoming for beginners.
-# ABOUTME: Installs colour theme, statusline, and enables helpful plugins. Fully reversible.
+# ABOUTME: One-command installer for Clawd Code — makes Claude Code welcoming for beginners.
+# ABOUTME: Installs colour theme, statusline, welcome skill, starter CLAUDE.md, and plugins. Reversible.
 
 set -e
 
@@ -11,16 +11,19 @@ C='\033[0;36m'  # cyan
 D='\033[0;90m'  # dim
 R='\033[0m'     # reset
 
-REPO_URL="https://raw.githubusercontent.com/maxtattonbrown/friendly-setup/main"
+REPO_URL="https://raw.githubusercontent.com/maxtattonbrown/clawd-code/main"
 CLAUDE_DIR="$HOME/.claude"
+SKILLS_DIR="$CLAUDE_DIR/skills"
 SETTINGS_FILE="$CLAUDE_DIR/settings.json"
 STATUSLINE_FILE="$CLAUDE_DIR/friendly-statusline.sh"
-BACKUP_FILE="$SETTINGS_FILE.friendly-backup"
+GLOBAL_CLAUDE_MD="$CLAUDE_DIR/CLAUDE.md"
+BACKUP_FILE="$SETTINGS_FILE.clawd-backup"
+CLAUDE_MD_BACKUP="$GLOBAL_CLAUDE_MD.clawd-backup"
 
 # ─── Uninstall ──────────────────────────────────────────────
 if [[ "$1" == "--uninstall" ]]; then
   echo ""
-  echo -e "${C}Uninstalling Friendly Setup...${R}"
+  echo -e "${C}Uninstalling Clawd Code...${R}"
 
   # Restore settings backup
   if [[ -f "$BACKUP_FILE" ]]; then
@@ -29,20 +32,30 @@ if [[ "$1" == "--uninstall" ]]; then
     echo -e "  ${G}✓${R} Settings restored from backup"
   fi
 
-  # Remove statusline
-  if [[ -f "$STATUSLINE_FILE" ]]; then
-    rm "$STATUSLINE_FILE"
-    echo -e "  ${G}✓${R} Statusline removed"
+  # Restore CLAUDE.md backup
+  if [[ -f "$CLAUDE_MD_BACKUP" ]]; then
+    cp "$CLAUDE_MD_BACKUP" "$GLOBAL_CLAUDE_MD"
+    rm "$CLAUDE_MD_BACKUP"
+    echo -e "  ${G}✓${R} CLAUDE.md restored from backup"
+  elif [[ -f "$GLOBAL_CLAUDE_MD" ]] && grep -q "Installed by Clawd Code" "$GLOBAL_CLAUDE_MD" 2>/dev/null; then
+    rm "$GLOBAL_CLAUDE_MD"
+    echo -e "  ${G}✓${R} CLAUDE.md removed"
   fi
 
-  # Remove theme files (only the ones we installed)
+  # Remove statusline
+  [[ -f "$STATUSLINE_FILE" ]] && rm "$STATUSLINE_FILE"
+
+  # Remove welcome skill
+  [[ -d "$SKILLS_DIR/welcome" ]] && rm -rf "$SKILLS_DIR/welcome"
+
+  # Remove theme files
   [[ -f "$HOME/.config/ghostty/themes/friendly-terminal" ]] && rm "$HOME/.config/ghostty/themes/friendly-terminal"
   [[ -f "$HOME/.warp/themes/friendly-terminal.yaml" ]] && rm "$HOME/.warp/themes/friendly-terminal.yaml"
   [[ -f "$HOME/.config/kitty/themes/friendly-terminal.conf" ]] && rm "$HOME/.config/kitty/themes/friendly-terminal.conf"
 
-  echo -e "  ${G}✓${R} Theme files removed"
+  echo -e "  ${G}✓${R} All Clawd Code files removed"
   echo ""
-  echo -e "${G}Done.${R} Friendly Setup has been removed. Your original settings are restored."
+  echo -e "${G}Done.${R} Your original settings are restored."
   echo ""
   exit 0
 fi
@@ -50,8 +63,10 @@ fi
 # ─── Welcome ────────────────────────────────────────────────
 echo ""
 echo -e "${C}╭────────────────────────────────────────╮${R}"
-echo -e "${C}│${R}  ${G}Friendly Setup${R}                         ${C}│${R}"
-echo -e "${C}│${R}  Making Claude Code a bit friendlier.  ${C}│${R}"
+echo -e "${C}│${R}                                        ${C}│${R}"
+echo -e "${C}│${R}  🐾 ${G}Clawd Code${R}                          ${C}│${R}"
+echo -e "${C}│${R}  The friendliest way to use Claude Code ${C}│${R}"
+echo -e "${C}│${R}                                        ${C}│${R}"
 echo -e "${C}╰────────────────────────────────────────╯${R}"
 echo ""
 
@@ -141,7 +156,32 @@ if ! command -v jq &>/dev/null && ! command -v python3 &>/dev/null; then
   echo -e "    Install jq: ${C}brew install jq${R}"
 fi
 
-# ─── Step 4: Configure Claude Code settings ─────────────────
+# ─── Step 4: Install welcome skill ──────────────────────────
+echo -e "  ${D}Installing welcome skill...${R}"
+
+mkdir -p "$SKILLS_DIR/welcome"
+curl -fsSL "$REPO_URL/skills/welcome/SKILL.md" > "$SKILLS_DIR/welcome/SKILL.md"
+
+echo -e "  ${G}✓${R} Welcome skill installed — type ${C}/welcome${R} in Claude Code"
+
+# ─── Step 5: Install starter CLAUDE.md ───────────────────────
+echo -e "  ${D}Setting up beginner-friendly instructions...${R}"
+
+if [[ -f "$GLOBAL_CLAUDE_MD" ]]; then
+  # Back up existing CLAUDE.md
+  cp "$GLOBAL_CLAUDE_MD" "$CLAUDE_MD_BACKUP"
+  # Append our instructions
+  echo "" >> "$GLOBAL_CLAUDE_MD"
+  echo "<!-- Installed by Clawd Code -->" >> "$GLOBAL_CLAUDE_MD"
+  curl -fsSL "$REPO_URL/claude-md/CLAUDE.md" >> "$GLOBAL_CLAUDE_MD"
+  echo -e "  ${G}✓${R} Added beginner instructions to your existing CLAUDE.md"
+else
+  echo "<!-- Installed by Clawd Code -->" > "$GLOBAL_CLAUDE_MD"
+  curl -fsSL "$REPO_URL/claude-md/CLAUDE.md" >> "$GLOBAL_CLAUDE_MD"
+  echo -e "  ${G}✓${R} CLAUDE.md created with beginner-friendly instructions"
+fi
+
+# ─── Step 6: Configure Claude Code settings ─────────────────
 echo -e "  ${D}Configuring Claude Code...${R}"
 
 # Back up existing settings
@@ -197,19 +237,14 @@ if [[ -f "$BACKUP_FILE" ]]; then
   echo -e "  ${D}(your previous settings are backed up)${R}"
 fi
 
-# ─── Step 5: Plugins enabled ────────────────────────────────
-echo -e "  ${G}✓${R} Plugins enabled:"
-echo -e "    ${D}· Frontend design — build web pages and UIs${R}"
-echo -e "    ${D}· Document skills — create PDFs, docs, spreadsheets${R}"
-echo -e "    ${D}· Explanatory mode — Claude explains what it's doing${R}"
-
 # ─── Done ────────────────────────────────────────────────────
 echo ""
-echo -e "${G}All done!${R}"
+echo -e "${G}All done!${R} 🐾"
 echo ""
-echo -e "  Open Claude Code and you'll see a status bar at the bottom."
-echo -e "  It'll tell you when your conversation is getting long"
-echo -e "  and what to do about it."
+echo -e "  Open Claude Code and you'll see:"
+echo -e "  · A status bar with tips and context health"
+echo -e "  · Type ${C}/welcome${R} for a friendly introduction"
+echo -e "  · Claude will explain what it's doing as it goes"
 echo ""
 echo -e "  ${D}To undo everything:${R}"
 echo -e "  ${C}curl -fsSL $REPO_URL/install.sh | bash -s -- --uninstall${R}"
