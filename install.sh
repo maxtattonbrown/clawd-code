@@ -126,8 +126,11 @@ case "$terminal" in
   terminal-app)
     curl -fsSL "$REPO_URL/themes/Friendly%20Terminal.terminal" > "/tmp/Friendly Terminal.terminal"
     open "/tmp/Friendly Terminal.terminal" 2>/dev/null || true
-    echo -e "  ${G}✓${R} Theme imported into Terminal"
-    echo -e "  ${Y}→${R} Set as default: Terminal → Settings → Profiles → select Friendly Terminal → Default"
+    sleep 1
+    defaults write com.apple.Terminal "Default Window Settings" -string "Friendly Terminal" 2>/dev/null
+    defaults write com.apple.Terminal "Startup Window Settings" -string "Friendly Terminal" 2>/dev/null
+    echo -e "  ${G}✓${R} Theme installed and set as default"
+    echo -e "  ${D}(new Terminal windows will use the warm theme)${R}"
     ;;
   warp)
     mkdir -p "$HOME/.warp/themes"
