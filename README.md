@@ -4,14 +4,15 @@ The friendliest way to use [Claude Code](https://docs.anthropic.com/en/docs/clau
 
 ## Before you start
 
-You'll need Claude Code installed first. If you haven't done that yet:
+You'll need a Claude account and Claude Code installed. If you haven't done that yet:
 
-1. Open your terminal (on Mac, search for "Terminal" in Spotlight)
-2. Paste this and press Enter:
+1. [Sign up for Claude](https://claude.ai/referral/hWvMMltr7Q) if you don't have an account
+2. Open your terminal (on Mac, search for "Terminal" in Spotlight)
+3. Paste this and press Enter:
    ```bash
    curl -fsSL https://claude.ai/install.sh | bash
    ```
-3. Run `claude` once to log in and set up your account
+4. Run `claude` once to log in and set up your account
 
 That's the hard bit done. Now make it friendly:
 
