@@ -30,6 +30,17 @@ if [[ "$1" == "--uninstall" ]]; then
     cp "$BACKUP_FILE" "$SETTINGS_FILE"
     rm "$BACKUP_FILE"
     echo -e "  ${G}✓${R} Settings restored from backup"
+  elif [[ -f "$SETTINGS_FILE" ]]; then
+    # No backup means we created settings.json fresh — remove our keys
+    if command -v jq &>/dev/null; then
+      jq 'del(.statusLine) | del(.enabledPlugins["frontend-design@claude-plugins-official"]) | del(.enabledPlugins["document-skills@anthropic-agent-skills"]) | del(.enabledPlugins["explanatory-output-style@claude-code-plugins"]) | if .enabledPlugins == {} then del(.enabledPlugins) else . end | if . == {} then empty else . end' "$SETTINGS_FILE" > "${SETTINGS_FILE}.tmp" 2>/dev/null
+      if [[ -s "${SETTINGS_FILE}.tmp" ]]; then
+        mv "${SETTINGS_FILE}.tmp" "$SETTINGS_FILE"
+      else
+        rm -f "${SETTINGS_FILE}.tmp" "$SETTINGS_FILE"
+      fi
+    fi
+    echo -e "  ${G}✓${R} Settings cleaned up"
   fi
 
   # Restore CLAUDE.md backup
