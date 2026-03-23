@@ -180,13 +180,23 @@ case "$terminal" in
   terminal-app)
     curl -fsSL "$REPO_URL/themes/Friendly%20Terminal.terminal" > "/tmp/Friendly Terminal.terminal"
     open "/tmp/Friendly Terminal.terminal" 2>/dev/null || true
-    sleep 1
-    # Set as default for new windows
-    defaults write com.apple.Terminal "Default Window Settings" -string "Friendly Terminal" 2>/dev/null
-    defaults write com.apple.Terminal "Startup Window Settings" -string "Friendly Terminal" 2>/dev/null
-    # Switch the current window to the new theme — instant transformation
-    osascript -e 'tell application "Terminal" to set current settings of front window to settings set "Friendly Terminal"' 2>/dev/null || true
-    echo -e "  ${G}✓${R} Theme applied"
+    sleep 2
+    # Apply to current window and set as default via AppleScript.
+    # Using defaults write races with Terminal.app's own pref saves,
+    # so we talk to the app directly instead.
+    if osascript -e '
+      tell application "Terminal"
+        set targetProfile to settings set "Friendly Terminal"
+        set current settings of front window to targetProfile
+        set default settings to targetProfile
+        set startup settings to targetProfile
+      end tell
+    ' 2>/dev/null; then
+      echo -e "  ${G}✓${R} Theme applied"
+    else
+      echo -e "  ${Y}!${R} Theme imported but couldn't auto-apply."
+      echo -e "    Open Terminal → Settings → Profiles → Friendly Terminal → click 'Default'"
+    fi
     ;;
   warp)
     mkdir -p "$HOME/.warp/themes"
