@@ -1,8 +1,8 @@
-# 🐾 Clawd Code
+# Claude Code: Easy Mode
 
 The nicest, simplest way to get started with [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
-![Clawd Code in action — warm parchment theme with helpful status bar](screenshot.png)
+![Easy Mode in action — warm parchment theme with helpful status bar](screenshot.png)
 
 ## Before you start
 
