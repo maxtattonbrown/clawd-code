@@ -335,72 +335,127 @@
     };
   }
 
-  // ── During-work commentary (signal-aware) ──
-  function workComment(evts) {
-    var reads = 0, writes = 0, edits = 0, cmds = 0, searches = 0, agents = 0, webs = 0;
-    evts.forEach(function(e) {
-      if (e.type === 'file_read') reads++;
-      if (e.type === 'file_create') writes++;
-      if (e.type === 'file_edit') edits++;
-      if (e.type === 'command') cmds++;
-      if (e.type === 'search') searches++;
-      if (e.type === 'agent') agents++;
-      if (e.type === 'web') webs++;
+  // ── Pattern detection across full session history ──
+  // WingMax "chews" on all events and only speaks when a pattern emerges.
+  var lastPattern = '', sessionStart = Date.now(), lastCommitTime = 0;
+
+  function detectPattern(allEvents) {
+    if (allEvents.length === 0) return '';
+
+    var now = Date.now();
+    var sig = extractTurnSignals(allEvents);
+
+    // Count patterns across the session
+    var editsByFile = {}, errorCount = 0, testRuns = 0, testFails = 0;
+    var totalEdits = 0, totalCreates = 0, totalReads = 0, commitCount = 0;
+
+    allEvents.forEach(function(e) {
+      var s = e.signals || {};
+      if (e.type === 'file_edit' && e.detail) {
+        editsByFile[e.detail] = (editsByFile[e.detail] || 0) + 1;
+        totalEdits++;
+      }
+      if (e.type === 'file_create') totalCreates++;
+      if (e.type === 'file_read') totalReads++;
+      if (s.exit_ok === false) errorCount++;
+      if (s.category === 'test') { testRuns++; if (s.exit_ok === false) testFails++; }
+      if (s.category === 'git') commitCount++;
     });
 
-    var total = evts.length;
-    var sig = extractTurnSignals(evts);
-
-    if (mode === 'beginner') {
-      // Signal-driven commentary first
-      if (sig.hasTestFailure)
-        return 'Claude ran the tests and some didn\u2019t pass. It\u2019ll probably try to fix that now.';
-      if (sig.hasBuildFailure)
-        return 'The build didn\u2019t work first time \u2014 Claude\u2019s figuring out why.';
-      if (sig.hasError)
-        return 'Something didn\u2019t go as expected \u2014 Claude\u2019s working through it.';
-      if (sig.languages.length > 0 && reads >= 4)
-        return 'Claude\u2019s reading through your ' + sig.languages[0] + ' files \u2014 getting the full picture.';
-      if (agents > 0)
-        return pick([
-          'Claude just asked a helper for extra research. Teamwork!',
-          'Claude\u2019s getting help from a specialist \u2014 this might take a moment.',
-        ]);
-      if (reads >= 6 && writes === 0 && edits === 0)
-        return 'Lots of reading \u2014 Claude likes to understand what\u2019s there before it acts.';
-      if (webs > 0)
-        return 'Claude\u2019s checking something online for you.';
-      if (total >= 10)
-        return 'Claude\u2019s been busy \u2014 this is a bigger task. Hang tight!';
-    } else {
-      // Intermediate: signal-driven, no duplicating what the done message will say
-      if (sig.hasTestFailure && sig.testSummary)
-        return 'Tests failing: ' + sig.testSummary + '. Let\u2019s see if Claude catches it.';
-      if (sig.hasTestFailure)
-        return 'Test failure. Claude\u2019s probably about to have another go.';
-      if (sig.hasBuildFailure && sig.errorHint)
-        return 'Build broke: ' + sig.errorHint.substring(0, 50);
-      if (sig.hasBuildFailure)
-        return 'Build failed. Claude\u2019s on it.';
-      if (sig.hasError && sig.errorHint)
-        return 'Error: ' + sig.errorHint.substring(0, 60);
-      if (sig.writeLanguages.length >= 2)
-        return 'Working across ' + sig.writeLanguages.join(' and ') + '.';
-      if (sig.totalLines >= 500 && reads >= 3)
-        return 'Heavy read \u2014 ' + sig.totalLines + ' lines. Building a picture of the codebase.';
-      if (agents > 0)
-        return 'Subagent spawned \u2014 Claude\u2019s parallelising.';
-      if (webs > 0)
-        return 'Web lookup \u2014 Claude wants current info on this.';
-      if (reads >= 6 && writes === 0 && edits === 0)
-        return reads + ' files read, nothing written. Still figuring things out.';
-      if (searches >= 4)
-        return searches + ' searches so far. Claude\u2019s looking for something specific.';
-      if (total >= 10)
-        return total + ' tool calls. Bigger task \u2014 give it a moment.';
+    // Find most-edited file
+    var hotFile = '', hotCount = 0;
+    for (var f in editsByFile) {
+      if (editsByFile[f] > hotCount) { hotFile = f; hotCount = editsByFile[f]; }
     }
 
-    return ''; // Nothing noteworthy yet
+    var minutesWorking = Math.round((now - sessionStart) / 60000);
+
+    // ── Priority-ordered patterns ──
+
+    // 1. Test-fix cycle: tests ran, failed, edits happened, tests ran again
+    if (testFails > 0 && testRuns > testFails && totalEdits > 0)
+      return pick([
+        'Test-fix-test loop running. That\u2019s TDD \u2014 let it work.',
+        'Claude\u2019s in a test-fix cycle. ' + testRuns + ' test runs so far.',
+      ]);
+
+    // 2. Tests just failed (latest signal)
+    if (sig.hasTestFailure && sig.testSummary)
+      return sig.testSummary + '. Read the output yourself \u2014 it\u2019s usually clearer than Claude\u2019s summary.';
+    if (sig.hasTestFailure)
+      return 'Tests broke. Check the terminal for the actual error.';
+
+    // 3. Tests just passed
+    if (sig.bashCategories.indexOf('test') >= 0 && !sig.hasTestFailure)
+      return pick([
+        'All green. /commit before you touch anything else.',
+        'Tests passing. Lock it in.',
+      ]);
+
+    // 4. Repeated errors
+    if (errorCount >= 2)
+      return pick([
+        errorCount + ' errors this session. If Claude\u2019s going in circles, steer it.',
+        'Multiple errors. Might be worth a different approach.',
+      ]);
+
+    // 5. Build failure
+    if (sig.hasBuildFailure && sig.errorHint)
+      return 'Build broke: ' + sig.errorHint.substring(0, 50);
+    if (sig.hasBuildFailure)
+      return 'Build failed. The error message is in the terminal.';
+
+    // 6. Error just happened
+    if (sig.hasError && sig.errorHint)
+      return sig.errorHint.substring(0, 60);
+
+    // 7. Same file edited 3+ times (thrashing)
+    if (hotCount >= 3)
+      return pick([
+        hotFile + ' \u2014 ' + hotCount + ' edits. Maybe describe the end state you want.',
+        'You keep coming back to ' + hotFile + '. Try telling Claude exactly what it should look like.',
+      ]);
+
+    // 8. No commit in a while with edits happening
+    if (totalEdits >= 4 && commitCount === 0 && minutesWorking >= 10)
+      return pick([
+        minutesWorking + ' minutes of edits, no commits. /commit gives you a save point.',
+        'Been editing a while without committing. Worth saving your progress.',
+      ]);
+
+    // 9. Just committed
+    if (sig.bashCategories.indexOf('git') >= 0 && !sig.hasError) {
+      lastCommitTime = now;
+      return pick([
+        'Committed. Clean slate.',
+        'Work saved. Good stopping point if you need one.',
+      ]);
+    }
+
+    // 10. First file created in session
+    if (totalCreates === 1 && allEvents[0].type === 'file_create') {
+      var lang = (allEvents[0].signals || {}).lang;
+      if (lang) return 'First ' + lang + ' file. Have a look \u2014 then tell Claude what to change.';
+      return 'First file created. Open it up and see what Claude made.';
+    }
+
+    // 11. Heavy reading (exploring)
+    if (totalReads >= 8 && totalEdits === 0)
+      return pick([
+        totalReads + ' files read, nothing changed yet. Claude\u2019s still figuring things out.',
+        'Big exploration pass. If Claude seems stuck, try being more specific.',
+      ]);
+
+    // 12. Subagent
+    if (sig.hasAgent)
+      return 'Subagent finished. Claude delegated part of the task.';
+
+    // 13. Multi-language writes
+    if (sig.writeLanguages.length >= 2)
+      return 'Working across ' + sig.writeLanguages.join(' and ') + ' this session.';
+
+    // Nothing worth commenting on
+    return '';
   }
 
   // ── Done commentary (what Claude did) ──
@@ -696,21 +751,38 @@
     }).catch(function() {});
   }
 
+  // allSessionEvents accumulates across the whole session (not just one turn)
+  var allSessionEvents = [];
+
   function onDone() {
     avatarDone();
-    var c = comment(turnEvents);
     var files = listFiles(turnEvents);
-    if (c) {
-      // Only update bubble if there's something worth saying
-      say(c, false);
-      bubbleFiles.textContent = files;
-    } else {
-      // Nothing interesting — just show files if any, or keep previous bubble
-      if (files) {
+
+    if (mode === 'intermediate') {
+      // Pattern-based: check full session, only speak if new pattern
+      var pattern = detectPattern(allSessionEvents);
+      if (pattern && pattern !== lastPattern) {
+        // Push previous observation to history before showing new one
+        if (lastPattern) pushToHistory(lastPattern, '');
+        say(pattern, false);
+        lastPattern = pattern;
+        bubbleFiles.textContent = files;
+      } else if (files) {
+        // No new pattern, but files changed — show files only
         bubbleFiles.textContent = files;
       }
-      bubbleText.className = 'bubble-text';
+      // If no pattern and no files, keep previous bubble (silence)
+    } else {
+      // Beginner mode: use per-turn comment as before
+      var c = comment(turnEvents);
+      if (c) {
+        say(c, false);
+        bubbleFiles.textContent = files;
+      } else {
+        if (files) bubbleFiles.textContent = files;
+      }
     }
+
     sugLabel.textContent = mode === 'intermediate' ? pick(['Next move:', 'Worth trying:', 'If I were you:']) : 'You could try:';
     sugCmd.textContent = nextSuggestion(turnEvents);
     suggest.style.display = '';
@@ -762,16 +834,33 @@
           suggest.style.display = 'none';
           workCommentShown = false;
         }
-        real.slice(0, real.length - seenEvents).forEach(function(e) { turnEvents.push(e); });
+        var newEvts = real.slice(0, real.length - seenEvents);
+        newEvts.forEach(function(e) { turnEvents.push(e); allSessionEvents.push(e); });
         seenEvents = real.length;
         resetTimer();
 
-        // During-work commentary: update if something noteworthy
-        var wc = workComment(turnEvents);
-        if (wc && wc !== lastWorkComment) {
-          say(wc, true);
-          lastWorkComment = wc;
-          workCommentShown = true;
+        // During-work: check for urgent patterns (errors, test failures)
+        if (mode === 'intermediate') {
+          var pattern = detectPattern(allSessionEvents);
+          if (pattern && pattern !== lastPattern) {
+            say(pattern, true);
+            lastPattern = pattern;
+          }
+        } else {
+          // Beginner: use existing workComment for during-work
+          var sig = extractTurnSignals(turnEvents);
+          var total = turnEvents.length;
+          var reads = turnEvents.filter(function(e) { return e.type === 'file_read'; }).length;
+          if (sig.hasTestFailure)
+            say('Claude ran the tests and some didn\u2019t pass. It\u2019ll probably try to fix that now.', true);
+          else if (sig.hasBuildFailure)
+            say('The build didn\u2019t work first time \u2014 Claude\u2019s figuring out why.', true);
+          else if (sig.hasError)
+            say('Something didn\u2019t go as expected \u2014 Claude\u2019s working through it.', true);
+          else if (reads >= 6)
+            say('Lots of reading \u2014 Claude likes to understand what\u2019s there before it acts.', true);
+          else if (total >= 10)
+            say('Claude\u2019s been busy \u2014 this is a bigger task. Hang tight!', true);
         }
       }
 
