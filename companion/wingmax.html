@@ -265,6 +265,9 @@
 
   function pushToHistory(text, files) {
     if (!text || text === 'Claude\u2019s on it\u2026') return;
+    // Dedup: don't repeat the same message consecutively
+    var last = history.lastElementChild;
+    if (last && last.firstChild && last.firstChild.textContent === text) return;
     var msg = document.createElement('div');
     msg.className = 'history-msg';
     msg.textContent = text;
@@ -417,26 +420,22 @@
         ]);
       return 'All done!';
     } else {
-      // Intermediate mode: specific, names files, references CC patterns
+      // Intermediate mode: only speak when there's something genuinely useful to say.
+      // File changes are worth naming. Everything else — you can see it in the terminal.
+      var allFiles = created.concat(edited);
       if (hasHtml)
         return 'Built ' + created.filter(function(f) { return f.endsWith('.html'); }).join(', ') + ' \u2014 preview below.';
       if (created.length > 0 && edited.length > 0)
-        return 'Created ' + created.length + ' file' + (created.length > 1 ? 's' : '') + ', edited ' + edited.length + '. Read-before-write pattern.';
+        return 'Created ' + created.join(', ') + '. Edited ' + edited.join(', ') + '.';
       if (created.length > 0)
         return 'Created ' + created.join(', ') + '.';
-      if (edited.length > 0 && hasRead)
-        return 'Read then edited ' + edited.join(', ') + '. Claude checks before changing.';
       if (edited.length > 0)
         return 'Edited ' + edited.join(', ') + '.';
-      if (hasWeb)
-        return 'Web lookup \u2014 pulled external info for this.';
-      if (hasCmd && hasRead)
-        return 'Ran commands after reading your files. Likely setup or verification.';
-      if (hasCmd)
-        return 'Ran shell commands. Check the terminal for details.';
-      if (hasRead || hasSearch)
-        return 'Read-only pass \u2014 Claude explored without changing anything.';
-      return 'Done.';
+      if (hasWeb && (hasRead || hasSearch))
+        return 'Checked the web and your files. No changes made.';
+      // For read-only, command-only, or search-only turns: say nothing useful happened.
+      // An empty string means "don't update the bubble" — keep showing the previous message.
+      return '';
     }
   }
 
@@ -529,8 +528,19 @@
 
   function onDone() {
     avatarDone();
-    say(comment(turnEvents), false);
-    bubbleFiles.textContent = listFiles(turnEvents);
+    var c = comment(turnEvents);
+    var files = listFiles(turnEvents);
+    if (c) {
+      // Only update bubble if there's something worth saying
+      say(c, false);
+      bubbleFiles.textContent = files;
+    } else {
+      // Nothing interesting — just show files if any, or keep previous bubble
+      if (files) {
+        bubbleFiles.textContent = files;
+      }
+      bubbleText.className = 'bubble-text';
+    }
     sugLabel.textContent = 'You could try:';
     sugCmd.textContent = nextSuggestion(turnEvents);
     suggest.style.display = '';
@@ -573,8 +583,11 @@
           turnEvents = [];
           phase = 'working';
           avatarWorking();
-          say('Claude\u2019s on it\u2026', true);
-          bubbleFiles.textContent = '';
+          if (mode === 'beginner') {
+            say('Claude\u2019s on it\u2026', true);
+            bubbleFiles.textContent = '';
+          }
+          // Intermediate: keep previous bubble visible — the avatar dots show working state
           suggest.style.display = 'none';
           workCommentShown = false;
         }
