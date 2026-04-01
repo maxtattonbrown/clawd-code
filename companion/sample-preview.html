@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Space Website</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #0B0D17;
+    color: #E8E6E3;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  .stars {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(2px 2px at 20px 30px, #fff, transparent),
+                radial-gradient(2px 2px at 40px 70px, rgba(255,255,255,0.8), transparent),
+                radial-gradient(1px 1px at 90px 40px, #fff, transparent),
+                radial-gradient(1px 1px at 130px 80px, rgba(255,255,255,0.6), transparent),
+                radial-gradient(2px 2px at 160px 30px, #fff, transparent),
+                radial-gradient(1px 1px at 200px 60px, rgba(255,255,255,0.7), transparent),
+                radial-gradient(2px 2px at 250px 20px, #fff, transparent),
+                radial-gradient(1px 1px at 300px 50px, rgba(255,255,255,0.5), transparent),
+                radial-gradient(2px 2px at 350px 90px, #fff, transparent),
+                radial-gradient(1px 1px at 80px 100px, rgba(255,255,255,0.6), transparent);
+    background-size: 400px 120px;
+    animation: twinkle 4s ease-in-out infinite alternate;
+  }
+
+  @keyframes twinkle {
+    from { opacity: 0.7; }
+    to { opacity: 1; }
+  }
+
+  .content {
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    min-height: 100vh; padding: 40px 24px;
+    text-align: center;
+  }
+
+  .planet {
+    width: 80px; height: 80px;
+    background: linear-gradient(135deg, #4A90D9, #1B3A6B);
+    border-radius: 50%;
+    box-shadow: 0 0 40px rgba(74, 144, 217, 0.3), inset -8px -4px 12px rgba(0,0,0,0.4);
+    margin-bottom: 32px;
+    animation: float 6s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
+  h1 {
+    font-size: 28px; font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 12px;
+    background: linear-gradient(135deg, #E8E6E3, #4A90D9);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+
+  p {
+    font-size: 15px; color: #8B8994;
+    max-width: 300px; line-height: 1.6;
+    margin-bottom: 24px;
+  }
+
+  .btn {
+    display: inline-block;
+    padding: 10px 24px;
+    background: linear-gradient(135deg, #4A90D9, #6B5CE7);
+    color: white; border: none; border-radius: 8px;
+    font-size: 14px; font-weight: 600;
+    cursor: pointer; text-decoration: none;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(74, 144, 217, 0.4);
+  }
+</style>
+</head>
+<body>
+  <div class="stars"></div>
+  <div class="content">
+    <div class="planet"></div>
+    <h1>Welcome to Space</h1>
+    <p>A little website about the universe, built in seconds by Claude Code. The stars are real CSS — no images needed.</p>
+    <a class="btn" href="#">Explore the cosmos</a>
+  </div>
+</body>
+</html>

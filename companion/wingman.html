@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wingman</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #F5F0E8; --card: #FFFFFF; --fg: #2D2B26; --muted: #7A756B;
+    --accent: #DA7756; --green: #3E7A4F; --tan: #DDD1C0; --border: #E0D8CC;
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--fg); line-height: 1.6;
+    min-height: 100vh; display: flex; align-items: flex-end; justify-content: center;
+  }
+
+  .page {
+    max-width: 440px; width: 100%; padding: 24px 24px 48px;
+    display: flex; flex-direction: column; gap: 20px; align-items: flex-start;
+  }
+
+  /* ── Wingman avatar ─────────────────── */
+  .wingman {
+    display: flex; align-items: flex-end; gap: 12px; width: 100%;
+  }
+
+  .avatar {
+    width: 44px; height: 44px; background: var(--accent); border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 16px; font-weight: 700; color: white;
+    flex-shrink: 0; transition: transform 0.2s ease;
+    user-select: none;
+  }
+
+  .avatar.bounce {
+    animation: bounce 0.4s ease;
+  }
+
+  @keyframes bounce {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.15); }
+    100% { transform: scale(1); }
+  }
+
+  /* Eye blink: > briefly becomes - */
+  .avatar .eye { display: inline; }
+
+  /* Working state: hide mouth, show dots */
+  .avatar.working .mouth { display: none; }
+  .avatar.working .dots { display: inline; }
+  .avatar .dots { display: none; }
+
+  .avatar .dots span {
+    animation: dotPulse 1.4s ease-in-out infinite;
+  }
+  .avatar .dots span:nth-child(2) { animation-delay: 0.2s; }
+  .avatar .dots span:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes dotPulse {
+    0%, 80%, 100% { opacity: 0.2; }
+    40% { opacity: 1; }
+  }
+
+  /* ── Speech bubble ──────────────────── */
+  .bubble {
+    background: var(--card); border-radius: 18px 18px 18px 4px;
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 8px rgba(45,43,38,0.06);
+    padding: 20px 24px; flex: 1; position: relative;
+  }
+
+  .bubble-text {
+    font-size: 16px; line-height: 1.6; margin-bottom: 4px;
+  }
+
+  .bubble-text.muted { color: var(--muted); }
+
+  .bubble-files {
+    font-family: var(--mono); font-size: 12px; color: var(--tan);
+  }
+
+  /* ── Suggestion ─────────────────────── */
+  .suggest {
+    margin-left: 56px; width: calc(100% - 56px);
+    background: var(--bg); border-radius: 12px;
+    padding: 14px 18px; text-align: center;
+    border: 1px dashed var(--border);
+  }
+
+  .suggest-label { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+
+  .suggest-cmd {
+    font-family: var(--mono); font-size: 14px; font-weight: 500; color: var(--fg);
+  }
+
+  /* ── Preview ────────────────────────── */
+  .preview {
+    display: none; width: 100%; margin-left: 0;
+    background: var(--card); border-radius: 16px;
+    border: 2px solid var(--green); box-shadow: 0 4px 16px rgba(62,122,79,0.10);
+    overflow: hidden;
+  }
+  .preview.visible { display: block; animation: pop 0.5s ease-out; }
+
+  @keyframes pop {
+    from { opacity: 0; transform: scale(0.97); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .preview-bar {
+    padding: 10px 20px; font-size: 13px; color: var(--green); font-weight: 600;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .preview iframe {
+    width: 100%; height: 340px; border: none; background: white;
+  }
+
+  /* ── Footer ─────────────────────────── */
+  .footer {
+    margin-left: 56px; font-size: 12px; color: var(--tan);
+  }
+
+  .footer a { color: var(--muted); text-decoration: none; }
+  .footer a:hover { color: var(--accent); }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  @media (max-width: 480px) {
+    .page { padding: 16px 12px 32px; }
+    .bubble { padding: 16px 18px; }
+    .suggest, .footer { margin-left: 48px; width: calc(100% - 48px); }
+    .avatar { width: 36px; height: 36px; font-size: 13px; border-radius: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="wingman">
+    <div class="avatar" id="avatar" aria-hidden="true"><span class="eye">&gt;</span><span class="mouth">_</span><span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
+    <div class="bubble">
+      <div class="bubble-text" id="bubble-text">Hey! I'm Wingman. I'll keep you company while you use Claude Code over in your terminal.</div>
+      <div class="bubble-files" id="bubble-files"></div>
+    </div>
+  </div>
+
+  <div class="suggest" id="suggest">
+    <div class="suggest-label" id="suggest-label">In your terminal, try typing:</div>
+    <div class="suggest-cmd" id="suggest-cmd">hello</div>
+  </div>
+
+  <div class="preview" id="preview">
+    <div class="preview-bar">Here's what you made</div>
+    <iframe id="preview-frame" title="Live preview" sandbox="allow-scripts allow-same-origin"></iframe>
+  </div>
+
+  <div class="footer" id="footer">
+    You can't break anything &middot; <a href="https://code.claude.com/docs/en/quickstart" target="_blank" rel="noopener">About Claude Code</a>
+  </div>
+
+</div>
+<script>
+(function() {
+  'use strict';
+
+  var POLL_MS = 800, DONE_MS = 4000, STATUS_URL = '/status.json', CONFIG_URL = '/config.json';
+  var seenEvents = 0, phase = 'welcome', timer = null;
+  var turnEvents = [], hasPreview = false, pvVer = 0, lastFC = 0;
+  var mode = 'beginner'; // beginner or intermediate
+  var lastWorkComment = '', workCommentShown = false;
+
+  var avatar     = document.getElementById('avatar');
+  var bubbleText = document.getElementById('bubble-text');
+  var bubbleFiles = document.getElementById('bubble-files');
+  var suggest    = document.getElementById('suggest');
+  var sugLabel   = document.getElementById('suggest-label');
+  var sugCmd     = document.getElementById('suggest-cmd');
+  var preview    = document.getElementById('preview');
+  var pvFrame    = document.getElementById('preview-frame');
+  var footer     = document.getElementById('footer');
+
+  function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
+
+  var eyeEl = avatar.querySelector('.eye');
+
+  // ── Load config (mode) ──
+  fetch(CONFIG_URL).then(function(r) {
+    if (!r.ok) return;
+    return r.json();
+  }).then(function(cfg) {
+    if (cfg && cfg.mode) mode = cfg.mode;
+    applyMode();
+  }).catch(function() {});
+
+  function applyMode() {
+    if (mode === 'intermediate') {
+      footer.innerHTML = 'Claude Code docs &middot; <a href="https://code.claude.com/docs/en/quickstart" target="_blank" rel="noopener">Quickstart</a>';
+    }
+  }
+
+  // ── Avatar expressions ──
+  function avatarWorking() {
+    avatar.className = 'avatar working';
+  }
+
+  function avatarDone() {
+    avatar.className = 'avatar bounce';
+    blink();
+  }
+
+  function blink() {
+    eyeEl.textContent = '-';
+    setTimeout(function() { eyeEl.textContent = '>'; }, 200);
+  }
+
+  function scheduleIdleBlink() {
+    var delay = 8000 + Math.random() * 12000;
+    setTimeout(function() {
+      if (phase !== 'working') blink();
+      scheduleIdleBlink();
+    }, delay);
+  }
+  scheduleIdleBlink();
+
+  function say(text, muted) {
+    bubbleText.textContent = text;
+    bubbleText.className = 'bubble-text' + (muted ? ' muted' : '');
+  }
+
+  // ── During-work commentary (judgement-based) ──
+  function workComment(evts) {
+    var reads = 0, writes = 0, edits = 0, cmds = 0, searches = 0, agents = 0, webs = 0;
+    evts.forEach(function(e) {
+      if (e.type === 'file_read') reads++;
+      if (e.type === 'file_create') writes++;
+      if (e.type === 'file_edit') edits++;
+      if (e.type === 'command') cmds++;
+      if (e.type === 'search') searches++;
+      if (e.type === 'agent') agents++;
+      if (e.type === 'web') webs++;
+    });
+
+    var total = evts.length;
+
+    // Only comment when something noteworthy is happening
+    if (mode === 'beginner') {
+      if (reads >= 6 && writes === 0 && edits === 0)
+        return pick([
+          'Claude\u2019s reading through your files \u2014 getting the full picture before making changes.',
+          'Lots of reading \u2014 Claude likes to understand what\u2019s there before it acts.',
+        ]);
+      if (agents > 0)
+        return pick([
+          'Claude just asked a helper for extra research. Teamwork!',
+          'Claude\u2019s getting help from a specialist \u2014 this might take a moment.',
+        ]);
+      if (cmds >= 3)
+        return pick([
+          'Claude\u2019s running a few commands \u2014 setting things up for you.',
+          'A few commands running \u2014 Claude\u2019s getting your environment ready.',
+        ]);
+      if (webs > 0)
+        return pick([
+          'Claude\u2019s checking something online for you.',
+          'Looking something up on the web \u2014 Claude wants current info.',
+        ]);
+      if (total >= 10)
+        return pick([
+          'Claude\u2019s been busy \u2014 this is a bigger task. Hang tight!',
+          'Quite a bit going on \u2014 Claude\u2019s working through it step by step.',
+        ]);
+    } else {
+      // Intermediate mode: more specific, names actions
+      if (reads >= 6 && writes === 0 && edits === 0)
+        return pick([
+          'Heavy read pass \u2014 Claude\u2019s mapping the codebase before making changes.',
+          reads + ' files read, no writes yet. Reconnaissance phase.',
+        ]);
+      if (agents > 0)
+        return pick([
+          'Subagent spawned \u2014 Claude\u2019s delegating part of this task.',
+          'Claude kicked off a subagent for deeper research.',
+        ]);
+      if (cmds >= 3)
+        return pick([
+          'Multiple shell commands \u2014 likely installing deps or running builds.',
+          cmds + ' commands so far. Claude\u2019s doing setup work.',
+        ]);
+      if (searches >= 4)
+        return pick([
+          'Broad search \u2014 Claude\u2019s hunting for the right files.',
+          searches + ' searches. Claude\u2019s finding its way around.',
+        ]);
+      if (webs > 0)
+        return 'Web fetch \u2014 checking docs or looking something up.';
+      if (total >= 10)
+        return 'Big task \u2014 ' + total + ' tool calls so far. This one\u2019s complex.';
+    }
+
+    return ''; // Nothing noteworthy yet
+  }
+
+  // ── Done commentary (what Claude did) ──
+  function comment(evts) {
+    var created = [], edited = [], hasRead = false, hasCmd = false, hasSearch = false, hasWeb = false;
+    evts.forEach(function(e) {
+      if (e.type === 'file_create' && e.detail) created.push(e.detail);
+      if (e.type === 'file_edit' && e.detail) edited.push(e.detail);
+      if (e.type === 'file_read') hasRead = true;
+      if (e.type === 'command') hasCmd = true;
+      if (e.type === 'search') hasSearch = true;
+      if (e.type === 'web') hasWeb = true;
+    });
+
+    var hasHtml = created.some(function(f) { return f.endsWith('.html'); });
+
+    if (mode === 'beginner') {
+      if (hasHtml)
+        return pick([
+          'Oh nice \u2014 Claude just built you a website! Have a look below.',
+          'There you go \u2014 a whole website! Check it out below.',
+        ]);
+      if (created.length > 0 && (hasRead || hasSearch))
+        return pick([
+          'Claude read your files first, then put something new together for you. Smart \u2014 it always checks what\u2019s there before making anything.',
+          'Nice \u2014 Claude checked what you had, then created something based on it.',
+        ]);
+      if (created.length > 0)
+        return pick([
+          'There you go \u2014 Claude just made that for you. It\u2019s saved on your computer.',
+          'Done! Claude created that for you \u2014 it\u2019s a real file you can open.',
+        ]);
+      if (edited.length > 0 && (hasRead || hasSearch))
+        return pick([
+          'Claude checked your files first, then made some changes. It only touched what needed updating.',
+          'Claude had a look, then tweaked things for you. Everything else stayed as it was.',
+        ]);
+      if (edited.length > 0)
+        return pick([
+          'Claude just updated your files. Only the bits that needed changing.',
+          'Done \u2014 Claude made those changes for you.',
+        ]);
+      if (hasWeb)
+        return pick([
+          'Claude went online and looked some things up for you.',
+          'Claude checked the web to get you current information.',
+        ]);
+      if (hasCmd)
+        return pick([
+          'Claude just ran a command on your computer \u2014 that\u2019s how it sets things up and gets things done.',
+          'Claude ran a command for you. Don\u2019t worry \u2014 it always asks permission first.',
+        ]);
+      if (hasRead || hasSearch)
+        return pick([
+          'Claude had a read through your files. Sometimes it just needs to understand what\u2019s there.',
+          'Claude looked through your files to get the full picture.',
+        ]);
+      return 'All done!';
+    } else {
+      // Intermediate mode: specific, names files, references CC patterns
+      if (hasHtml)
+        return 'Built ' + created.filter(function(f) { return f.endsWith('.html'); }).join(', ') + ' \u2014 preview below.';
+      if (created.length > 0 && edited.length > 0)
+        return 'Created ' + created.length + ' file' + (created.length > 1 ? 's' : '') + ', edited ' + edited.length + '. Read-before-write pattern.';
+      if (created.length > 0)
+        return 'Created ' + created.join(', ') + '.';
+      if (edited.length > 0 && hasRead)
+        return 'Read then edited ' + edited.join(', ') + '. Claude checks before changing.';
+      if (edited.length > 0)
+        return 'Edited ' + edited.join(', ') + '.';
+      if (hasWeb)
+        return 'Web lookup \u2014 pulled external info for this.';
+      if (hasCmd && hasRead)
+        return 'Ran commands after reading your files. Likely setup or verification.';
+      if (hasCmd)
+        return 'Ran shell commands. Check the terminal for details.';
+      if (hasRead || hasSearch)
+        return 'Read-only pass \u2014 Claude explored without changing anything.';
+      return 'Done.';
+    }
+  }
+
+  function listFiles(evts) {
+    var names = {};
+    evts.forEach(function(e) {
+      if ((e.type === 'file_create' || e.type === 'file_edit') && e.detail) names[e.detail] = true;
+    });
+    return Object.keys(names).join('  ');
+  }
+
+  // ── Suggestions per mode ──
+  function nextSuggestion(evts) {
+    var hasCreated = evts.some(function(e) { return e.type === 'file_create'; });
+    var hasEdited = evts.some(function(e) { return e.type === 'file_edit'; });
+
+    if (mode === 'beginner') {
+      if (hasCreated) return pick([
+        'adjust the tone', 'check it for mistakes', 'explain what you just made',
+        'try something completely different', 'make it shorter'
+      ]);
+      if (hasEdited) return pick([
+        'change something else', 'undo that', 'check it over',
+        'explain what changed', 'try something new'
+      ]);
+      return pick([
+        'save that to a file', 'explain that in simpler terms',
+        'try something different', 'help me write an email',
+        'organise my files'
+      ]);
+    } else {
+      // Intermediate: reference CC features and developer workflows
+      if (hasCreated) return pick([
+        'review the diff', 'type /commit to save this',
+        'run the tests', 'refactor for readability',
+        'add error handling'
+      ]);
+      if (hasEdited) return pick([
+        'check git diff', 'type /commit', 'run tests',
+        'explain the change', 'undo with git restore'
+      ]);
+      return pick([
+        'type /compact \u2014 context might be getting full',
+        'try /init to set up project instructions',
+        'ask Claude to explain this codebase',
+        'run the test suite', 'check git status'
+      ]);
+    }
+  }
+
+  function welcomeSuggestion() {
+    if (mode === 'beginner') {
+      return pick([
+        'help me draft an email to my team',
+        'make me a simple website about space',
+        'organise the files in this folder',
+        'summarise this document for me',
+        'help me plan my week',
+        'explain what\u2019s in this folder'
+      ]);
+    } else {
+      return pick([
+        'explain this codebase to me',
+        'refactor the auth flow',
+        'write tests for the API',
+        'find all TODO comments',
+        'review recent git changes',
+        'set up CI for this project'
+      ]);
+    }
+  }
+
+  function showPreview(fl) {
+    if (hasPreview && fl.length === lastFC) return;
+    var f = 'index.html';
+    for (var i = 0; i < fl.length; i++) { if (fl[i].endsWith('.html')) { f = fl[i]; break; } }
+    pvVer++;
+    pvFrame.src = '/preview/' + encodeURIComponent(f) + '?v=' + pvVer;
+    if (!hasPreview) { preview.classList.add('visible'); hasPreview = true; }
+  }
+
+  function onDone() {
+    avatarDone();
+    say(comment(turnEvents), false);
+    bubbleFiles.textContent = listFiles(turnEvents);
+    sugLabel.textContent = 'You could try:';
+    sugCmd.textContent = nextSuggestion(turnEvents);
+    suggest.style.display = '';
+    workCommentShown = false;
+    phase = 'done';
+  }
+
+  function resetTimer() {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(function() { if (phase === 'working') onDone(); }, DONE_MS);
+  }
+
+  function poll() {
+    fetch(STATUS_URL).then(function(r) {
+      if (!r.ok) throw new Error();
+      return r.json();
+    }).then(function(data) {
+      var evts = data.events || [], fl = data.files_touched || [];
+      var hasHtml = data.has_html || false, stopped = data.stopped || false;
+      var real = evts.filter(function(e) { return e.type !== 'hello'; });
+      var hasHello = evts.length > real.length;
+
+      if (hasHello && phase === 'welcome') {
+        phase = 'ready';
+        if (mode === 'beginner') {
+          say('Claude Code is ready! Ask it anything \u2014 write an email, build something, organise your files, look something up. Whatever you need.', false);
+        } else {
+          say('Claude Code is ready. What are we working on?', false);
+        }
+        sugLabel.textContent = 'Try typing:';
+        sugCmd.textContent = welcomeSuggestion();
+      }
+
+      if (real.length > seenEvents) {
+        if (phase !== 'working') {
+          turnEvents = [];
+          phase = 'working';
+          avatarWorking();
+          say('Claude\u2019s on it\u2026', true);
+          bubbleFiles.textContent = '';
+          suggest.style.display = 'none';
+          workCommentShown = false;
+        }
+        real.slice(0, real.length - seenEvents).forEach(function(e) { turnEvents.push(e); });
+        seenEvents = real.length;
+        resetTimer();
+
+        // During-work commentary: update if something noteworthy
+        var wc = workComment(turnEvents);
+        if (wc && wc !== lastWorkComment) {
+          say(wc, true);
+          lastWorkComment = wc;
+          workCommentShown = true;
+        }
+      }
+
+      if (stopped && phase === 'working') {
+        if (timer) clearTimeout(timer);
+        onDone();
+      }
+
+      if (hasHtml) showPreview(fl);
+      lastFC = fl.length;
+    }).catch(function() {});
+  }
+
+  setInterval(poll, POLL_MS);
+  poll();
+})();
+</script>
+</body>
+</html>
