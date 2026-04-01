@@ -47,15 +47,34 @@ detect_file_category() {
 }
 
 # ── Bash command category from command string ──
+# Uses the first word/binary of the command to avoid false positives
+# from arguments or commit messages that mention "test" etc.
 detect_bash_category() {
   local cmd="$1"
-  case "$cmd" in
-    *test*|*jest*|*pytest*|*vitest*|*"cargo test"*|*"go test"*|*"npm test"*|*"npx playwright"*)  echo "test" ;;
-    *build*|*webpack*|*esbuild*|*tsc*|*"cargo build"*|*make*)  echo "build" ;;
-    *install*|*"npm i"*|*"pip install"*|*"pip3 install"*|*"brew install"*|*apt*)  echo "install" ;;
-    *"git "*|*"gh "*)  echo "git" ;;
-    *serve*|*start*|*dev*|*localhost*)  echo "server" ;;
-    *lint*|*eslint*|*prettier*|*ruff*)  echo "lint" ;;
+  # Extract the first token (the binary being run)
+  local bin="${cmd%% *}"
+  bin="${bin##*/}"  # strip path
+
+  case "$bin" in
+    jest|pytest|vitest|mocha)  echo "test" ;;
+    npm|npx)
+      case "$cmd" in
+        *" test"*|*"npx jest"*|*"npx vitest"*|*"npx playwright test"*)  echo "test" ;;
+        *" run build"*|*" run dev"*)  echo "build" ;;
+        *" install"*|*" i "*)  echo "install" ;;
+        *" start"*|*" run dev"*|*" run serve"*)  echo "server" ;;
+        *)  echo "general" ;;
+      esac ;;
+    cargo)
+      case "$cmd" in *" test"*) echo "test" ;; *" build"*) echo "build" ;; *) echo "general" ;; esac ;;
+    go)
+      case "$cmd" in *" test"*) echo "test" ;; *" build"*) echo "build" ;; *) echo "general" ;; esac ;;
+    make|webpack|esbuild|tsc|vite)  echo "build" ;;
+    pip|pip3)  echo "install" ;;
+    brew)
+      case "$cmd" in *install*) echo "install" ;; *) echo "general" ;; esac ;;
+    git|gh)  echo "git" ;;
+    eslint|prettier|ruff|biome)  echo "lint" ;;
     *)  echo "general" ;;
   esac
 }
@@ -101,13 +120,17 @@ if command -v jq &>/dev/null; then
       BASH_CMD=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
       BASH_CAT=$(detect_bash_category "$BASH_CMD")
       if [ "$HAS_RESPONSE" = "true" ]; then
+        # tool_response can be a string OR an object with stdout/stderr fields
         SIGNALS=$(echo "$INPUT" | jq -c --arg cat "$BASH_CAT" '
-          (.tool_response // "" | tostring) as $resp |
+          (if (.tool_response | type) == "object"
+           then ((.tool_response.stdout // "") + "\n" + (.tool_response.stderr // ""))
+           else (.tool_response // "" | tostring)
+           end) as $resp |
           {
-            exit_ok: ($resp | test("(?i)(error|FAIL|fatal|panic|Traceback|command not found|No such file|Permission denied|ENOENT)") | not),
+            exit_ok: ($resp | test("(?i)(\\berror\\b|\\bFAIL\\b|\\bfatal\\b|\\bpanic\\b|Traceback|command not found|No such file|Permission denied|ENOENT)") | not),
             category: $cat,
-            error_hint: (if ($resp | test("(?i)(error|fail|fatal|panic|traceback)"))
-              then ($resp | split("\n") | map(select(test("(?i)(error|fail|panic|traceback)"))) | first // "" | .[:80])
+            error_hint: (if ($resp | test("(?i)(\\berror\\b|\\bFAIL\\b|\\bfatal\\b|\\bpanic\\b|Traceback)"))
+              then ($resp | split("\n") | map(select(test("(?i)(\\berror\\b|\\bfail\\b|\\bpanic\\b|traceback)"))) | first // "" | .[:80])
               else "" end),
             test_summary: (if ($resp | test("(?i)(passed|failed|Tests:|test result)"))
               then ($resp | split("\n") | map(select(test("(?i)(\\d+.*(passed|failed)|Tests:|test result)"))) | first // "" | .[:60])
@@ -119,7 +142,11 @@ if command -v jq &>/dev/null; then
       ;;
     Read)
       if [ "$HAS_RESPONSE" = "true" ]; then
-        LINE_COUNT=$(echo "$INPUT" | jq '(.tool_response // "" | tostring) | split("\n") | length' 2>/dev/null)
+        LINE_COUNT=$(echo "$INPUT" | jq '
+          (if (.tool_response | type) == "object"
+           then (.tool_response.content // .tool_response | tostring)
+           else (.tool_response // "" | tostring) end)
+          | split("\n") | length' 2>/dev/null)
         SIGNALS=$(jq -n --arg lang "$LANG" --arg fcat "$FILE_CAT" --argjson lc "${LINE_COUNT:-0}" \
           '{lang: $lang, file_category: $fcat, line_count: $lc}')
       else
@@ -128,7 +155,10 @@ if command -v jq &>/dev/null; then
       ;;
     Edit)
       if [ "$HAS_RESPONSE" = "true" ]; then
-        EDIT_OK=$(echo "$INPUT" | jq '(.tool_response // "" | tostring) | test("(?i)(error|failed)") | not' 2>/dev/null)
+        EDIT_OK=$(echo "$INPUT" | jq '
+          (if (.tool_response | type) == "object"
+           then (.tool_response.success // true)
+           else ((.tool_response // "" | tostring) | test("(?i)(\\berror\\b|failed)") | not) end)' 2>/dev/null)
         SIGNALS=$(jq -n --arg lang "$LANG" --argjson ok "${EDIT_OK:-true}" '{lang: $lang, success: $ok}')
       else
         SIGNALS=$(jq -n --arg lang "$LANG" '{lang: $lang}')
@@ -137,20 +167,12 @@ if command -v jq &>/dev/null; then
     Write)
       SIGNALS=$(jq -n --arg lang "$LANG" '{lang: $lang}')
       ;;
-    Grep)
+    Grep|Glob)
       if [ "$HAS_RESPONSE" = "true" ]; then
         SIGNALS=$(echo "$INPUT" | jq -c '
-          (.tool_response // "" | tostring) as $resp |
-          ($resp | split("\n") | map(select(length > 0)) | length) as $count |
-          {match_count: $count, found: ($count > 0)}' 2>/dev/null)
-      else
-        SIGNALS='{"found": false, "match_count": 0}'
-      fi
-      ;;
-    Glob)
-      if [ "$HAS_RESPONSE" = "true" ]; then
-        SIGNALS=$(echo "$INPUT" | jq -c '
-          (.tool_response // "" | tostring) as $resp |
+          (if (.tool_response | type) == "object"
+           then (.tool_response.content // .tool_response | tostring)
+           else (.tool_response // "" | tostring) end) as $resp |
           ($resp | split("\n") | map(select(length > 0)) | length) as $count |
           {match_count: $count, found: ($count > 0)}' 2>/dev/null)
       else
