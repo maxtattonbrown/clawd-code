@@ -1,13 +1,13 @@
 #!/bin/bash
 # ABOUTME: Stop hook that fires when Claude finishes responding.
-# ABOUTME: Sets stopped=true in status.json so the Wingman page knows Claude is done.
+# ABOUTME: Sets stopped=true in status.json so the WingMax page knows Claude is done.
 
 STATUS_FILE="$HOME/.claude/companion/status.json"
 TEMP_FILE="$HOME/.claude/companion/status.tmp.json"
 
 [ ! -f "$STATUS_FILE" ] && exit 0
 
-# Session scoping: only process Stop from the active Wingman session
+# Session scoping: only process Stop from the active WingMax session
 INPUT=$(cat)
 ACTIVE_SESSION_FILE="$HOME/.claude/companion/active-session"
 if [ -f "$ACTIVE_SESSION_FILE" ]; then

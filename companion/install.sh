@@ -23,7 +23,7 @@ if [ "$1" = "--uninstall" ]; then
 
   # Remove shell alias
   for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
-    [ -f "$rc" ] && sed -i.bak '/# Wingmax/d;/alias wingman=/d' "$rc" && rm -f "${rc}.bak"
+    [ -f "$rc" ] && sed -i.bak '/# Wingmax/d;/alias wingmax=/d' "$rc" && rm -f "${rc}.bak"
   done
 
   # Remove hooks from settings.json (best-effort — leaves file valid)
@@ -55,20 +55,20 @@ echo ""
 mkdir -p "$COMPANION_DIR"
 
 # Download files
-FILES="wingman.html wingman-hook.sh wingman-stop-hook.sh wingman-server.py"
+FILES="wingmax.html wingmax-hook.sh wingmax-stop-hook.sh wingmax-server.py"
 for f in $FILES; do
   echo "  Downloading $f..."
   curl -fsSL "$REPO_BASE/companion/$f" -o "$COMPANION_DIR/$f"
 done
 
 # Make scripts executable
-chmod +x "$COMPANION_DIR/wingman-hook.sh" "$COMPANION_DIR/wingman-stop-hook.sh" "$COMPANION_DIR/wingman-server.py"
+chmod +x "$COMPANION_DIR/wingmax-hook.sh" "$COMPANION_DIR/wingmax-stop-hook.sh" "$COMPANION_DIR/wingmax-server.py"
 
-# Create the wingman launcher script
-cat > "$COMPANION_DIR/wingman.sh" <<'LAUNCHER'
+# Create the wingmax launcher script
+cat > "$COMPANION_DIR/wingmax.sh" <<'LAUNCHER'
 #!/bin/bash
 # ABOUTME: Launcher for Wingmax — starts server, opens browser, launches Claude Code.
-# ABOUTME: Usage: wingman [--open|--stop|--mode beginner|intermediate]
+# ABOUTME: Usage: wingmax [--open|--stop|--mode beginner|intermediate]
 
 COMPANION_DIR="$HOME/.claude/companion"
 PID_FILE="$COMPANION_DIR/server.pid"
@@ -87,12 +87,12 @@ case "$1" in
     exit 0
     ;;
   --open)
-    open "http://localhost:$PORT/wingman.html" 2>/dev/null || xdg-open "http://localhost:$PORT/wingman.html" 2>/dev/null
+    open "http://localhost:$PORT/wingmax.html" 2>/dev/null || xdg-open "http://localhost:$PORT/wingmax.html" 2>/dev/null
     exit 0
     ;;
   --mode)
     if [ -z "$2" ] || { [ "$2" != "beginner" ] && [ "$2" != "intermediate" ]; }; then
-      echo "Usage: wingman --mode beginner|intermediate"
+      echo "Usage: wingmax --mode beginner|intermediate"
       exit 1
     fi
     echo "{\"mode\": \"$2\"}" > "$COMPANION_DIR/config.json"
@@ -123,7 +123,7 @@ echo -n "" > "$COMPANION_DIR/active-session"
 
 # Start the server if not already running
 if ! lsof -i ":$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-  WINGMAN_PROJECT_DIR="$(pwd)" python3 "$COMPANION_DIR/wingman-server.py" &
+  WINGMAX_PROJECT_DIR="$(pwd)" python3 "$COMPANION_DIR/wingmax-server.py" &
   for i in 1 2 3 4 5; do
     sleep 0.3
     lsof -i ":$PORT" -sTCP:LISTEN >/dev/null 2>&1 && break
@@ -131,12 +131,12 @@ if ! lsof -i ":$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
 fi
 
 # Open the companion page
-open "http://localhost:$PORT/wingman.html" 2>/dev/null || xdg-open "http://localhost:$PORT/wingman.html" 2>/dev/null
+open "http://localhost:$PORT/wingmax.html" 2>/dev/null || xdg-open "http://localhost:$PORT/wingmax.html" 2>/dev/null
 
 # Launch Claude Code
 claude "$@"
 LAUNCHER
-chmod +x "$COMPANION_DIR/wingman.sh"
+chmod +x "$COMPANION_DIR/wingmax.sh"
 
 # ── Add hooks to settings.json ──
 echo "  Configuring hooks..."
@@ -151,7 +151,7 @@ if [ ! -f "$SETTINGS_FILE" ]; then
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/.claude/companion/wingman-hook.sh",
+            "command": "$HOME/.claude/companion/wingmax-hook.sh",
             "async": true
           }
         ]
@@ -163,7 +163,7 @@ if [ ! -f "$SETTINGS_FILE" ]; then
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/.claude/companion/wingman-stop-hook.sh",
+            "command": "$HOME/.claude/companion/wingmax-stop-hook.sh",
             "async": true
           }
         ]
@@ -183,7 +183,7 @@ with open('$SETTINGS_FILE') as f:
 
 hooks = s.setdefault('hooks', {})
 
-def has_wingman_hook(entries):
+def has_wingmax_hook(entries):
     for entry in entries:
         for h in entry.get('hooks', []):
             if 'companion/' in h.get('command', ''):
@@ -191,17 +191,17 @@ def has_wingman_hook(entries):
     return False
 
 ptu = hooks.setdefault('PostToolUse', [])
-if not has_wingman_hook(ptu):
+if not has_wingmax_hook(ptu):
     ptu.append({
         'matcher': '',
-        'hooks': [{'type': 'command', 'command': '\$HOME/.claude/companion/wingman-hook.sh', 'async': True}]
+        'hooks': [{'type': 'command', 'command': '\$HOME/.claude/companion/wingmax-hook.sh', 'async': True}]
     })
 
 stop = hooks.setdefault('Stop', [])
-if not has_wingman_hook(stop):
+if not has_wingmax_hook(stop):
     stop.append({
         'matcher': '',
-        'hooks': [{'type': 'command', 'command': '\$HOME/.claude/companion/wingman-stop-hook.sh', 'async': True}]
+        'hooks': [{'type': 'command', 'command': '\$HOME/.claude/companion/wingmax-stop-hook.sh', 'async': True}]
     })
 
 with open('$SETTINGS_FILE', 'w') as f:
@@ -211,10 +211,10 @@ with open('$SETTINGS_FILE', 'w') as f:
 fi
 
 # ── Add shell alias ──
-ALIAS_LINE='alias wingman="$HOME/.claude/companion/wingman.sh"  # Wingmax'
+ALIAS_LINE='alias wingmax="$HOME/.claude/companion/wingmax.sh"  # Wingmax'
 for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
   if [ -f "$rc" ]; then
-    if ! grep -q 'alias wingman=' "$rc" 2>/dev/null; then
+    if ! grep -q 'alias wingmax=' "$rc" 2>/dev/null; then
       echo "" >> "$rc"
       echo "$ALIAS_LINE" >> "$rc"
     fi
@@ -227,15 +227,15 @@ printf "  Are you new to Claude Code? (y/n) "
 read -r answer
 if [ "$answer" = "y" ] || [ "$answer" = "Y" ] || [ "$answer" = "yes" ]; then
   echo '{"mode": "beginner"}' > "$COMPANION_DIR/config.json"
-  echo "  Set to beginner mode. You can switch later with: wingman --mode intermediate"
+  echo "  Set to beginner mode. You can switch later with: wingmax --mode intermediate"
 else
   echo '{"mode": "intermediate"}' > "$COMPANION_DIR/config.json"
-  echo "  Set to intermediate mode. You can switch with: wingman --mode beginner"
+  echo "  Set to intermediate mode. You can switch with: wingmax --mode beginner"
 fi
 
 echo ""
 echo "  >_  Wingmax installed!"
 echo ""
-echo "  To start: open a terminal, cd to your project, and type: wingman"
+echo "  To start: open a terminal, cd to your project, and type: wingmax"
 echo "  To remove: curl -fsSL $REPO_BASE/install.sh | bash -s -- --uninstall"
 echo ""

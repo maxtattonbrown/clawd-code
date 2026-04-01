@@ -1,5 +1,5 @@
 #!/bin/bash
-# ABOUTME: Launcher for Easy Mode with Browser Wingman.
+# ABOUTME: Launcher for Easy Mode with Browser WingMax.
 # ABOUTME: Starts the companion server, opens the browser, and launches Claude Code.
 
 COMPANION_DIR="$HOME/.claude/companion"
@@ -30,7 +30,7 @@ echo -n "" > "$ACTIVE_SESSION_FILE"
 
 # Start the companion server if not already running
 if ! lsof -i ":$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-  WINGMAN_PROJECT_DIR="$(pwd)" python3 "$COMPANION_DIR/wingman-server.py" &
+  WINGMAX_PROJECT_DIR="$(pwd)" python3 "$COMPANION_DIR/wingmax-server.py" &
   # Wait briefly for the server to start
   for i in 1 2 3 4 5; do
     sleep 0.3
@@ -39,7 +39,7 @@ if ! lsof -i ":$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
 fi
 
 # Open the companion page in the default browser
-open "http://localhost:$PORT/wingman.html" 2>/dev/null
+open "http://localhost:$PORT/wingmax.html" 2>/dev/null
 
 # Launch Claude Code in the foreground — pass through any arguments
 claude "$@"

@@ -1,6 +1,6 @@
 #!/bin/bash
 # ABOUTME: PostToolUse hook that writes Claude Code activity to a JSON status file.
-# ABOUTME: The Browser Wingman companion page reads this file to show what Claude is doing.
+# ABOUTME: The Browser WingMax companion page reads this file to show what Claude is doing.
 
 STATUS_FILE="$HOME/.claude/companion/status.json"
 TEMP_FILE="$HOME/.claude/companion/status.tmp.json"
@@ -70,7 +70,7 @@ fi
 # Skip if no tool detected
 [ -z "$TOOL" ] && exit 0
 
-# Session scoping: only process events from the active Wingman session
+# Session scoping: only process events from the active WingMax session
 ACTIVE_SESSION_FILE="$HOME/.claude/companion/active-session"
 if [ -f "$ACTIVE_SESSION_FILE" ] && [ -n "$SESSION" ]; then
   ACTIVE_SESSION=$(cat "$ACTIVE_SESSION_FILE" 2>/dev/null)

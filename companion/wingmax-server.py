@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# ABOUTME: Tiny local HTTP server for the Browser Wingman companion page.
-# ABOUTME: Serves wingman.html, status.json, and project file previews on localhost:7788.
+# ABOUTME: Tiny local HTTP server for the Browser WingMax companion page.
+# ABOUTME: Serves wingmax.html, status.json, and project file previews on localhost:7788.
 
 import http.server
 import json
@@ -16,20 +16,20 @@ PID_FILE = os.path.join(COMPANION_DIR, "server.pid")
 IDLE_TIMEOUT = 1800  # 30 minutes
 
 # Track the project directory — set by the launcher via environment variable
-PROJECT_DIR = os.environ.get("WINGMAN_PROJECT_DIR", os.getcwd())
+PROJECT_DIR = os.environ.get("WINGMAX_PROJECT_DIR", os.getcwd())
 
 last_request_time = time.time()
 
 
-class WingmanHandler(http.server.BaseHTTPRequestHandler):
+class WingMaxHandler(http.server.BaseHTTPRequestHandler):
     """Serves companion files and project previews with no-cache headers."""
 
     def do_GET(self):
         global last_request_time
         last_request_time = time.time()
 
-        if self.path == "/" or self.path == "/wingman.html":
-            self.serve_file(os.path.join(COMPANION_DIR, "wingman.html"), "text/html")
+        if self.path == "/" or self.path == "/wingmax.html":
+            self.serve_file(os.path.join(COMPANION_DIR, "wingmax.html"), "text/html")
         elif self.path == "/status.json":
             self.serve_file(os.path.join(COMPANION_DIR, "status.json"), "application/json")
         elif self.path == "/config.json":
@@ -129,7 +129,7 @@ def main():
     watchdog.start()
 
     # Start server
-    server = http.server.HTTPServer(("127.0.0.1", PORT), WingmanHandler)
+    server = http.server.HTTPServer(("127.0.0.1", PORT), WingMaxHandler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

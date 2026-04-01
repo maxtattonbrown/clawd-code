@@ -1,8 +1,8 @@
-# Wingman — Design Spec
+# WingMax — Design Spec
 
 ## What it is
 
-Wingman is a browser companion for Claude Code. A little character `>_` that sits in a browser window next to the terminal, watches what Claude does, and helps you use it better + more effectively. It teaches you little bits about how coding works, suggests Claude Code features you may not know and helps you get acquainted with what’s possible.
+WingMax is a browser companion for Claude Code. A little character `>_` that sits in a browser window next to the terminal, watches what Claude does, and helps you use it better + more effectively. It teaches you little bits about how coding works, suggests Claude Code features you may not know and helps you get acquainted with what’s possible.
 
 It blinks, it comments, it suggests what to try next. It's the friendly face of the Claude Code.
 
@@ -11,19 +11,19 @@ It blinks, it comments, it suggests what to try next. It's the friendly face of 
 **One journey from day one, to day 100:**
 
 ### Beginners (Easy Mode users)
-People who've never used a terminal. They need comfort, explanation, and a sense that everything is OK. Wingman explains what Claude did in human terms, suggests what to try next, and shows them what they made.
+People who've never used a terminal. They need comfort, explanation, and a sense that everything is OK. WingMax explains what Claude did in human terms, suggests what to try next, and shows them what they made.
 
 ### Intermediate users
 As they get going, there’s more and more to learn about working this way. They don't need everything explained, but there are always new things to learn about how you build things reliably, how you use Claude Code to its maximum extent (subagents, Ralph loops, caching, local servers etc etc). 
 
 ## The character
 
-Wingman is `>_` — a side on face made from terminal symbols.
+WingMax is `>_` — a side on face made from terminal symbols.
 
 - `>` is the eye
 - `_` is the mouth
 - The eye blinks every 8–20 seconds (briefly becomes `-_`)
-- When Claude finishes, Wingman bounces and blinks
+- When Claude finishes, WingMax bounces and blinks
 - When Claude is working, the mouth wobbles in animated fashion: `>_-`
 - The coral square is the face. It's always visible, always watching.
 
@@ -41,15 +41,15 @@ Wingman is `>_` — a side on face made from terminal symbols.
 ### Architecture
 
 ```
-Claude Code ──[hooks]──> status.json ──[polling]──> wingman.html
+Claude Code ──[hooks]──> status.json ──[polling]──> wingmax.html
                               ↑
-                        wingman-server.py (localhost:7788)
+                        wingmax-server.py (localhost:7788)
 ```
 
 - **PostToolUse hook** (async): After each tool call, writes event to `~/.claude/companion/status.json`
 - **Stop hook** (async): When Claude finishes responding, sets `stopped: true`
 - **Python server**: Serves the HTML page and status file on localhost:7788. Also serves project files for the live preview.
-- **wingman.html**: Single self-contained file. Polls status.json, renders the UI.
+- **wingmax.html**: Single self-contained file. Polls status.json, renders the UI.
 
 ### What the page shows
 
@@ -67,7 +67,7 @@ Plus:
 
 | State | Avatar | Bubble | Suggestion |
 |---|---|---|---|
-| Welcome | `>_` blinking | "Hey! I'm Wingman..." | "In your terminal, try typing: hello" |
+| Welcome | `>_` blinking | "Hey! I'm WingMax..." | "In your terminal, try typing: hello" |
 | Ready | `>_` blinking | "Claude Code is ready! Ask it anything..." | First suggestion |
 | Working | `>_-_` dots | "Claude's working..." (muted) | Hidden |
 | Done | bounce + blink | Comment on what happened | "You could try: ..." |
@@ -103,32 +103,32 @@ Can be changed anytime.
 ### Standalone install (not via Easy Mode)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/maxtattonbrown/wingman/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/maxtattonbrown/wingmax/main/install.sh | bash
 ```
 
 The installer:
 1. Downloads companion files to `~/.claude/companion/`
 2. Adds PostToolUse + Stop hooks to `~/.claude/settings.json`
-3. Adds `wingman` shell alias to `~/.zshrc` / `~/.bashrc`
+3. Adds `wingmax` shell alias to `~/.zshrc` / `~/.bashrc`
 4. Asks: "Are you new to Claude Code?" → sets beginner or intermediate mode
 
 ### Via Easy Mode
 
-Easy Mode install includes Wingman in beginner mode automatically. No separate install needed.
+Easy Mode install includes WingMax in beginner mode automatically. No separate install needed.
 
-### The `wingman` command
+### The `wingmax` command
 
 ```bash
-wingman          # Reset status, start server, open browser, launch Claude Code
-wingman --open   # Just open the page (server already running)
-wingman --stop   # Stop the server
-wingman --mode beginner|intermediate   # Switch mode
+wingmax          # Reset status, start server, open browser, launch Claude Code
+wingmax --open   # Just open the page (server already running)
+wingmax --stop   # Stop the server
+wingmax --mode beginner|intermediate   # Switch mode
 ```
 
 ### Uninstall
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/maxtattonbrown/wingman/main/install.sh | bash -s -- --uninstall
+curl -fsSL https://raw.githubusercontent.com/maxtattonbrown/wingmax/main/install.sh | bash -s -- --uninstall
 ```
 
 Removes all files, hooks, and alias. Restores original settings.json if backed up.
@@ -146,12 +146,12 @@ Removes all files, hooks, and alias. Restores original settings.json if backed u
 
 Problem: hooks fire across all Claude Code sessions, writing to the same status file.
 
-Solution: The `wingman` launcher writes the launched session's ID to `~/.claude/companion/active-session`. The hook scripts check: if the event's `session_id` doesn't match, skip it. Only the Wingman session's events appear on the page.
+Solution: The `wingmax` launcher writes the launched session's ID to `~/.claude/companion/active-session`. The hook scripts check: if the event's `session_id` doesn't match, skip it. Only the WingMax session's events appear on the page.
 
 ## What's NOT in scope (for now)
 
 - Multi-session support (watching multiple Claude sessions)
-- Chat-back (typing in Wingman to send to Claude)
+- Chat-back (typing in WingMax to send to Claude)
 - History (previous sessions)
 - Mobile/responsive (it's a desktop companion)
 - Browser extension version
@@ -160,21 +160,21 @@ Solution: The `wingman` launcher writes the launched session's ID to `~/.claude/
 ## Open questions
 
 - **Should intermediate mode show a mini activity log?** A few lines of what happened, not just the summary. Might be useful for long tasks. Could be a collapsible "details" section.
-- **Should Wingman have a name beyond "Wingman"?** The `>_` character could have a proper name. Or maybe `>_` IS the name.
-- **Could Wingman comment during work, not just after?** E.g. "Ooh, Claude's reading a lot of files — this might take a minute." Needs care to avoid the noise problem we hit earlier.
-- **Repo structure**: Separate repo (`wingman`) or stays inside `claude-code-easy-mode`? Leaning separate since it's now a standalone addon.
+- **Should WingMax have a name beyond "WingMax"?** The `>_` character could have a proper name. Or maybe `>_` IS the name.
+- **Could WingMax comment during work, not just after?** E.g. "Ooh, Claude's reading a lot of files — this might take a minute." Needs care to avoid the noise problem we hit earlier.
+- **Repo structure**: Separate repo (`wingmax`) or stays inside `claude-code-easy-mode`? Leaning separate since it's now a standalone addon.
 
 ## Files
 
 ```
-wingman/
+wingmax/
 ├── install.sh              # Standalone installer
 ├── companion/
-│   ├── wingman.html        # The page
-│   ├── wingman-hook.sh     # PostToolUse hook
-│   ├── wingman-stop-hook.sh # Stop hook
-│   ├── wingman-server.py   # Local HTTP server
-│   └── wingman.sh          # Launcher (the `wingman` command)
+│   ├── wingmax.html        # The page
+│   ├── wingmax-hook.sh     # PostToolUse hook
+│   ├── wingmax-stop-hook.sh # Stop hook
+│   ├── wingmax-server.py   # Local HTTP server
+│   └── wingmax.sh          # Launcher (the `wingmax` command)
 ├── README.md
 └── screenshot.png
 ```
